@@ -1,30 +1,42 @@
-# zkResume Snapshots
+# zkResume Snapshot 🧠🔐
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+**A privacy-first credentialing dApp using iExec Confidential Computing and Neon EVM.**
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/nftrenegadoscls-projects/v0-zk-resume-snapshots)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/fteZNbzD7ej)
+## 🧩 Overview
 
-## Overview
+**zkResume Snapshot** allows users to **prove their work experience** or employment history without revealing sensitive details such as employer names, roles, or dates.
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+This is done by:
+1. Processing encrypted employment proofs inside iExec Trusted Execution Environments (TEEs).
+2. Generating a verifiable hash representing the proof.
+3. Minting a **non-transferable NFT on Neon EVM** as a zero-knowledge employment badge.
 
-## Deployment
+The result: a cryptographic resume snapshot that protects user privacy and proves credibility.
 
-Your project is live at:
+---
 
-**[https://vercel.com/nftrenegadoscls-projects/v0-zk-resume-snapshots](https://vercel.com/nftrenegadoscls-projects/v0-zk-resume-snapshots)**
+## 🚀 Use Case
 
-## Build your app
+- ✅ Freelancers and contractors under NDAs.
+- ✅ People leaving controversial companies but needing to prove experience.
+- ✅ On-chain identity or DeFi credit scoring, while maintaining job data privacy.
 
-Continue building your app on:
+---
 
-**[https://v0.dev/chat/projects/fteZNbzD7ej](https://v0.dev/chat/projects/fteZNbzD7ej)**
+## 🔧 Tech Stack
 
-## How It Works
+| Layer        | Stack                                       |
+|-------------|---------------------------------------------|
+| Confidential Computing | [iExec TEE](https://iex.ec) + iApp Generator |
+| Smart Contract | Solidity + Neon EVM                      |
+| Frontend     | React / Next.js (optional)                 |
+| Deployment   | Hardhat + Neon Devnet                      |
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+---
+
+## 📦 Installation
+
+```bash
+git clone https://github.com/your-repo/zkresume-snapshot.git
+cd zkresume-snapshot
+npm install
