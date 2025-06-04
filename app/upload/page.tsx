@@ -10,12 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Shield, Lock, ArrowLeft, AlertCircle, Wallet } from "lucide-react"
+import { Shield, Lock, ArrowLeft, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useConfidentialProcessing } from "../../hooks/use-confidential-processing"
 import type { ExperienceData } from "../../types/experience"
-import { WalletConnection } from "../../components/wallet-connection"
+import { MetaMaskWallet } from "../../components/metamask-wallet"
 
 export default function UploadPage() {
   const router = useRouter()
@@ -53,8 +53,17 @@ export default function UploadPage() {
 
       const result = await processExperience(experienceData)
 
-      // Redirect to processing page with real data
-      router.push(`/processing?taskId=${result.taskId}&hash=${result.hash}`)
+      // Redirect to processing page with real data and form data for NFT metadata
+      const params = new URLSearchParams({
+        taskId: result.taskId,
+        hash: result.hash,
+        role: formData.role,
+        experience: formData.experience,
+        industry: formData.industry,
+        allowValidation: formData.allowValidation.toString(),
+      })
+
+      router.push(`/processing?${params.toString()}`)
     } catch (err) {
       console.error("Error processing experience:", err)
       // Error is handled in the hook
@@ -89,13 +98,16 @@ export default function UploadPage() {
           </p>
         </div>
 
-        {/* Wallet connection component */}
+        {/* MetaMask wallet connection */}
         <div className="mb-6">
-          <WalletConnection
+          <MetaMaskWallet
             onConnectionChange={(connected, address) => {
               setWalletConnected(connected)
               setUserAddress(address || "")
             }}
+            showBalance={true}
+            showNetworkSwitch={true}
+            compact={false}
           />
         </div>
 
@@ -232,7 +244,7 @@ export default function UploadPage() {
 
               <Button type="submit" className="w-full py-6 text-lg" disabled={!canSubmit}>
                 {!walletConnected ? (
-                  "Connect your wallet first"
+                  "Connect MetaMask first"
                 ) : isProcessing ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
@@ -240,7 +252,7 @@ export default function UploadPage() {
                   </>
                 ) : (
                   <>
-                    <Wallet className="w-5 h-5 mr-2" />
+                    <Lock className="w-5 h-5 mr-2" />
                     Process privately with iExec
                   </>
                 )}

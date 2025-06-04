@@ -5,9 +5,10 @@ import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Shield, CheckCircle, Copy, ExternalLink } from "lucide-react"
+import { Shield, CheckCircle, Copy } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useConfidentialProcessing } from "../../hooks/use-confidential-processing"
+import { NFTMinting } from "../../components/nft-minting"
 
 export default function ProcessingPage() {
   const router = useRouter()
@@ -18,6 +19,12 @@ export default function ProcessingPage() {
   const searchParams = useSearchParams()
   const taskId = searchParams.get("taskId")
   const initialHash = searchParams.get("hash")
+
+  // Get form data from URL params for NFT metadata
+  const role = searchParams.get("role") || "Professional"
+  const experience = searchParams.get("experience") || "0"
+  const industry = searchParams.get("industry") || "Technology"
+  const allowValidation = searchParams.get("allowValidation") === "true"
 
   const { checkTaskStatus } = useConfidentialProcessing()
   const [taskStatus, setTaskStatus] = useState<string>("RUNNING")
@@ -58,8 +65,12 @@ export default function ProcessingPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleMintNFT = () => {
-    router.push("/dashboard")
+  const handleMintComplete = (tokenId: string) => {
+    console.log("NFT minted with token ID:", tokenId)
+    // Optionally redirect to dashboard after a delay
+    setTimeout(() => {
+      router.push("/dashboard")
+    }, 3000)
   }
 
   return (
@@ -201,10 +212,16 @@ export default function ProcessingPage() {
                   </div>
                 </div>
 
-                <Button onClick={handleMintNFT} className="w-full py-6 text-lg">
-                  Mint NFT on Neon EVM
-                  <ExternalLink className="ml-2 w-5 h-5" />
-                </Button>
+                <NFTMinting
+                  snapshotHash={generatedHash}
+                  metadata={{
+                    industry: industry,
+                    experience: experience,
+                    allowValidation: allowValidation,
+                    role: role,
+                  }}
+                  onMintComplete={handleMintComplete}
+                />
               </div>
             )}
           </CardContent>
