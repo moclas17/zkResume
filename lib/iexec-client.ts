@@ -20,28 +20,70 @@ export const createIExecClient = () => {
 
 // Create iExec client with user's wallet for signing (but on Bellecour network)
 export const createIExecClientWithWallet = async () => {
-  if (!window.ethereum) {
-    throw new Error("MetaMask not found")
+  if (typeof window === "undefined" || !window.ethereum) {
+    throw new Error("MetaMask is not installed or not available in this environment.")
   }
 
   try {
     // Request accounts to ensure we have permission
     await window.ethereum.request({ method: "eth_requestAccounts" })
 
-    // Create iExec client with MetaMask
+    // Create a custom provider that uses user's wallet for signing
+    // but connects to iExec Bellecour for RPC calls
+    const customProvider = {
+      // For account and signing methods, use the user's wallet
+      request: async (args: any) => {
+        if (
+          args.method === "eth_accounts" ||
+          args.method === "eth_requestAccounts" ||
+          args.method.startsWith("eth_sign") ||
+          args.method === "personal_sign" ||
+          args.method === "eth_sendTransaction" ||
+          args.method === "wallet_switchEthereumChain" || // Allow wallet to switch chain
+          args.method === "wallet_addEthereumChain" // Allow wallet to add chain
+        ) {
+          return window.ethereum.request(args)
+        }
+
+        // For other RPC calls, use iExec Bellecour
+        const response = await fetch(IEXEC_BELLECOUR_CONFIG.rpcUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: args.id || 1,
+            method: args.method,
+            params: args.params,
+          }),
+        })
+
+        const data = await response.json()
+        if (data.error) {
+          throw new Error(data.error.message)
+        }
+        return data.result
+      },
+    }
+
+    // Create iExec client with custom provider
     const iexec = new IExec({
-      ethProvider: window.ethereum,
+      ethProvider: customProvider,
+      chainId: IEXEC_BELLECOUR_CONFIG.chainId,
     })
 
-    // Check if we're on the correct network
+    // Check if we're on the correct network for iExec operations
+    // This is important for RLC balance checks and task submissions
     const network = await iexec.network.getNetwork()
     if (network.chainId !== IEXEC_BELLECOUR_CONFIG.chainId) {
-      console.log("Switching to iExec Bellecour network...")
-      await switchToIExecBellecour()
+      console.log("Attempting to switch to iExec Bellecour network...")
+      await switchToIExecBellecour() // This will prompt the user to switch/add network
 
-      // Recreate client after network switch
+      // Recreate client after network switch to ensure it's on the correct chain context
       return new IExec({
-        ethProvider: window.ethereum,
+        ethProvider: customProvider, // Use the custom provider again
+        chainId: IEXEC_BELLECOUR_CONFIG.chainId,
       })
     }
 
@@ -54,8 +96,7 @@ export const createIExecClientWithWallet = async () => {
 
 // iExec application and workerpool addresses on Bellecour
 export const IEXEC_CONFIG = {
-  // Real iExec addresses for Bellecour testnet
-  // These are public apps and workerpools available on iExec
+  // These are public apps and workerpools available on iExec Bellecour testnet
   app: "0x2b0e6b6a1d2e1c671809ce8c08a21f0db097a17a", // iExec Confidential Computing app
   workerpool: "0x5c288a5a69a7c5b42d9dd2d31bbabc1f5c9b0e0e", // iExec SGX workerpool
   category: 0, // Computation category (0 is the default)
@@ -70,7 +111,7 @@ export const IEXEC_CONFIG = {
 
 // Helper function to check if user needs to add iExec Bellecour network
 export const addIExecBellecourNetwork = async () => {
-  if (!window.ethereum) {
+  if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("MetaMask not found")
   }
 
@@ -85,7 +126,7 @@ export const addIExecBellecourNetwork = async () => {
           nativeCurrency: {
             name: "RLC",
             symbol: "RLC",
-            decimals: 18,
+            decimals: 18, // RLC has 18 decimals
           },
           blockExplorerUrls: ["https://blockscout-bellecour.iex.ec"],
         },
@@ -100,7 +141,7 @@ export const addIExecBellecourNetwork = async () => {
 
 // Helper function to switch to iExec Bellecour network
 export const switchToIExecBellecour = async () => {
-  if (!window.ethereum) {
+  if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("MetaMask not found")
   }
 
@@ -113,7 +154,9 @@ export const switchToIExecBellecour = async () => {
   } catch (error: any) {
     if (error.code === 4902) {
       // Network not added, add it first
+      console.log("iExec Bellecour network not found, adding it...")
       await addIExecBellecourNetwork()
+      // After adding, try switching again
       return switchToIExecBellecour()
     } else {
       console.error("Error switching to iExec Bellecour network:", error)
@@ -129,7 +172,7 @@ export const checkRLCBalance = async (iexec: any) => {
     const balance = await iexec.account.checkBalance(userAddress)
     return {
       rlc: balance.stake,
-      nRLC: balance.stake * Math.pow(10, 9), // Convert to nRLC
+      nRLC: balance.stake * Math.pow(10, 9), // Convert to nRLC (if needed for display)
     }
   } catch (error) {
     console.error("Error checking RLC balance:", error)

@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Shield, CheckCircle, Clock, AlertCircle, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { useConfidentialProcessing } from "../../hooks/use-confidential-processing"
-import { useNftMinting } from "../../hooks/use-nft-minting"
 import { NftMinting } from "../../components/nft-minting"
 
 export default function ProcessingPage() {
@@ -20,7 +19,6 @@ export default function ProcessingPage() {
   const [error, setError] = useState<string | null>(null)
 
   const { checkTaskStatus } = useConfidentialProcessing()
-  const { mintNft, isNftMinted, mintingStatus } = useNftMinting()
 
   // Check task status periodically
   useEffect(() => {
@@ -152,10 +150,10 @@ export default function ProcessingPage() {
           <CardFooter>
             <div className="w-full">
               {taskStatus === "COMPLETED" ? (
-                <NftMinting hash={hash} taskId={taskId} />
+                <NftMinting snapshotHash={hash} taskId={taskId} />
               ) : (
-                <Button disabled className="w-full">
-                  Waiting for processing to complete...
+                <Button disabled={isLoading} className="w-full">
+                  {isLoading ? "Loading status..." : "Waiting for processing to complete..."}
                 </Button>
               )}
             </div>

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Shield, Lock, ArrowLeft, AlertCircle, Wallet, ExternalLink, Info } from "lucide-react"
+import { Shield, Lock, ArrowLeft, AlertCircle, Wallet } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useConfidentialProcessing } from "../../hooks/use-confidential-processing"
@@ -83,7 +83,7 @@ export default function UploadPage() {
       const result = await processExperience(experienceData)
 
       // Redirect to processing page with real data
-      router.push(`/processing?taskId=${result.taskId}&hash=${result.hash}&simulated=${result.isSimulated || false}`)
+      router.push(`/processing?taskId=${result.taskId}&hash=${result.hash}`)
     } catch (err) {
       console.error("Error processing experience:", err)
       // Error is handled in the hook
@@ -130,26 +130,6 @@ export default function UploadPage() {
         <div className="mb-6">
           <WalletConnection onConnectionChange={handleWalletConnectionChange} showBalance={true} compact={false} />
         </div>
-
-        {/* RLC Info Card */}
-        <Card className="mb-6 border-blue-200 bg-blue-50">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <Info className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-blue-800 mb-1">RLC Tokens Information</p>
-                <p className="text-blue-700 mb-2">
-                  For real iExec processing, you need RLC tokens. If you don't have RLC, the system will use simulation
-                  mode to generate a valid hash for NFT minting.
-                </p>
-                <p className="text-blue-600 text-xs">
-                  ✓ Simulation mode still generates cryptographic proofs for NFT minting
-                  <br />✓ You can test the complete flow without RLC tokens
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <Card className="shadow-lg border-0">
           <CardHeader>
@@ -261,45 +241,22 @@ export default function UploadPage() {
               )}
 
               {isProcessing && (
-                <div
-                  className={`border rounded-lg p-4 ${
-                    status.isSimulated ? "bg-yellow-50 border-yellow-200" : "bg-blue-50 border-blue-200"
-                  }`}
-                >
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className={status.isSimulated ? "text-yellow-800" : "text-blue-800"}>{status.message}</span>
-                      <span className={status.isSimulated ? "text-yellow-600" : "text-blue-600"}>
-                        {status.progress}%
-                      </span>
+                      <span>{status.message}</span>
+                      <span className="text-blue-600">{status.progress}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-blue-200 rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          status.isSimulated ? "bg-yellow-500" : "bg-blue-600"
-                        }`}
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${status.progress}%` }}
                       />
                     </div>
                     {status.taskId && (
-                      <div className="flex flex-col gap-1">
-                        <p className={`text-xs ${status.isSimulated ? "text-yellow-700" : "text-blue-700"}`}>
-                          {status.isSimulated ? "Simulated " : ""}Task ID:{" "}
-                          <code className={`px-1 rounded ${status.isSimulated ? "bg-yellow-100" : "bg-blue-100"}`}>
-                            {status.taskId}
-                          </code>
-                        </p>
-                        {status.explorerUrl && !status.isSimulated && (
-                          <a
-                            href={status.explorerUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-700 flex items-center hover:underline"
-                          >
-                            View on iExec Explorer <ExternalLink className="w-3 h-3 ml-1" />
-                          </a>
-                        )}
-                      </div>
+                      <p className="text-xs text-blue-700">
+                        iExec task ID: <code className="bg-blue-100 px-1 rounded">{status.taskId}</code>
+                      </p>
                     )}
                   </div>
                 </div>
