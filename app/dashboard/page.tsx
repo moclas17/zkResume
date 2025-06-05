@@ -1,14 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Shield, ExternalLink, Share2, Plus, Calendar, Hash, Wallet } from "lucide-react"
+import { Shield, ExternalLink, Share2, Plus, Calendar, Hash } from "lucide-react"
 import Link from "next/link"
-import { useNFTMinting } from "../../hooks/use-nft-minting"
-import { useMetaMask } from "../../hooks/use-metamask"
-import { MetaMaskWallet } from "../../components/metamask-wallet"
 
 interface Snapshot {
   id: string
@@ -40,34 +37,6 @@ export default function DashboardPage() {
   ])
 
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [nftTokens, setNftTokens] = useState<any[]>([])
-
-  const { getUserNFTs, getTokenMetadata } = useNFTMinting()
-  const { isConnected, address } = useMetaMask()
-
-  useEffect(() => {
-    const loadUserNFTs = async () => {
-      if (!isConnected || !address) return
-
-      try {
-        const tokens = await getUserNFTs(address)
-
-        // Get metadata for each token
-        const tokensWithMetadata = await Promise.all(
-          tokens.map(async (token) => {
-            const metadata = await getTokenMetadata(token.tokenId)
-            return { ...token, metadata }
-          }),
-        )
-
-        setNftTokens(tokensWithMetadata)
-      } catch (error) {
-        console.error("Error loading NFTs:", error)
-      }
-    }
-
-    loadUserNFTs()
-  }, [getUserNFTs, getTokenMetadata, isConnected, address])
 
   const copyShareLink = async (snapshotId: string, nftId: string) => {
     const shareLink = `https://zkresume-snapshots.com/verify/${nftId}`
@@ -77,7 +46,7 @@ export default function DashboardPage() {
   }
 
   const viewOnBlockchain = (nftId: string) => {
-    window.open(`https://devnet.neonscan.org/token/0xc21c311b7fabeb355e8be695be0ad2e1b89b8c7b?a=${nftId}`, "_blank")
+    window.open(`https://neonscan.org/token/${nftId}`, "_blank")
   }
 
   return (
@@ -109,26 +78,6 @@ export default function DashboardPage() {
           <p className="text-gray-600">Manage your anonymous professional credentials</p>
         </div>
 
-        {/* Wallet Connection */}
-        {!isConnected && (
-          <div className="mb-8">
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <Wallet className="w-8 h-8 text-blue-600" />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-2">Connect your wallet to view NFTs</h3>
-                    <p className="text-blue-700 mb-4">
-                      Connect MetaMask to view your minted NFT credentials and manage your snapshots.
-                    </p>
-                    <MetaMaskWallet compact={true} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
         {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card>
@@ -151,7 +100,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Minted NFTs</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {isConnected ? nftTokens.length : snapshots.filter((s) => s.status === "minted").length}
+                    {snapshots.filter((s) => s.status === "minted").length}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -176,73 +125,10 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Real NFTs from blockchain */}
-        {isConnected && nftTokens.length > 0 && (
-          <Card className="shadow-lg border-0 mb-8">
-            <CardHeader>
-              <CardTitle>Your NFT Credentials (On-Chain)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {nftTokens.map((token) => (
-                  <div key={token.tokenId} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="default">NFT Minted</Badge>
-                          <Badge variant="outline">
-                            {token.metadata?.attributes?.find((attr: any) => attr.trait_type === "Industry")?.value ||
-                              "Unknown"}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">Token ID: #{token.tokenId}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => viewOnBlockchain(token.tokenId)}>
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          View on NeonScan
-                        </Button>
-                      </div>
-                    </div>
-
-                    {token.metadata && (
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 mb-1">NFT Metadata:</p>
-                          <div className="bg-gray-50 p-3 rounded text-xs">
-                            <p>
-                              <strong>Name:</strong> {token.metadata.name}
-                            </p>
-                            <p>
-                              <strong>Description:</strong> {token.metadata.description}
-                            </p>
-                            {token.metadata.attributes && (
-                              <div className="mt-2">
-                                <strong>Attributes:</strong>
-                                <ul className="ml-4 mt-1">
-                                  {token.metadata.attributes.map((attr: any, index: number) => (
-                                    <li key={index}>
-                                      {attr.trait_type}: {attr.value}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Demo Snapshots List */}
+        {/* Snapshots List */}
         <Card className="shadow-lg border-0">
           <CardHeader>
-            <CardTitle>Demo Snapshots</CardTitle>
+            <CardTitle>Your Minted Snapshots</CardTitle>
           </CardHeader>
           <CardContent>
             {snapshots.length === 0 ? (

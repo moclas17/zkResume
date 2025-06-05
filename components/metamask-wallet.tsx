@@ -1,18 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Wallet, ExternalLink, Copy, RefreshCw, AlertTriangle, CheckCircle, Power, Network, User } from "lucide-react"
-import { useMetaMask } from "../hooks/use-metamask"
+import { Wallet, ExternalLink, Copy, RefreshCw, AlertTriangle } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { useWallet } from "@/hooks/use-wallet"
 
 interface MetaMaskWalletProps {
   onConnectionChange?: (connected: boolean, address?: string) => void
   showBalance?: boolean
   showNetworkSwitch?: boolean
   compact?: boolean
+  redirectToDashboard?: boolean
 }
 
 export function MetaMaskWallet({
@@ -20,36 +22,92 @@ export function MetaMaskWallet({
   showBalance = true,
   showNetworkSwitch = true,
   compact = false,
+  redirectToDashboard = true,
 }: MetaMaskWalletProps) {
   const {
-    walletState,
-    isConnecting,
-    error,
-    isMetaMaskInstalled,
-    connectWallet,
-    disconnectWallet,
-    switchToNeonDevNet,
-    refreshBalance,
-    clearError,
     isConnected,
     address,
-    balance,
-    isCorrectNetwork,
-  } = useMetaMask()
+    chainId,
+    isLoading,
+    error: walletError,
+    connectWallet,
+    switchNetwork,
+    getBalance,
+  } = useWallet()
 
+  const [balance, setBalance] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(walletError)
 
-  const handleConnect = async () => {
-    const success = await connectWallet()
-    if (success && address) {
+  const router = useRouter()
+  const { toast } = useToast()
+
+  const NEON_DEVNET_CHAIN_ID = "0x335"
+  const NEON_DEVNET_CONFIG = {
+    chainId: NEON_DEVNET_CHAIN_ID,
+    chainName: "Neon EVM DevNet",
+    nativeCurrency: {
+      name: "NEON",
+      symbol: "NEON",
+      decimals: 18,
+    },
+    rpcUrls: ["https://devnet.neonevm.org"],
+    blockExplorerUrls: ["https://devnet.neonscan.org/"],
+  }
+
+  const isCorrectNetwork = chainId === NEON_DEVNET_CHAIN_ID
+  const isMetaMaskInstalled = typeof window !== "undefined" && window.ethereum
+
+  // Load balance when connected
+  useEffect(() => {
+    if (isConnected && address) {
+      refreshBalance()
+
+      // Notify parent component
       onConnectionChange?.(true, address)
+    } else {
+      onConnectionChange?.(false)
+    }
+  }, [isConnected, address])
+
+  // Update error from wallet hook
+  useEffect(() => {
+    setError(walletError)
+  }, [walletError])
+
+  const refreshBalance = async () => {
+    if (!isConnected || !address) return
+
+    setIsRefreshing(true)
+    try {
+      const newBalance = await getBalance()
+      setBalance(newBalance)
+    } catch (err) {
+      console.error("Error refreshing balance:", err)
+    } finally {
+      setIsRefreshing(false)
     }
   }
 
-  const handleDisconnect = async () => {
-    await disconnectWallet()
-    onConnectionChange?.(false)
+  const handleConnect = async () => {
+    const success = await connectWallet()
+
+    if (success && redirectToDashboard) {
+      toast({
+        title: "Wallet Connected",
+        description: "Successfully connected to MetaMask",
+      })
+
+      // Redirect to dashboard after successful connection
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 1000)
+    }
+  }
+
+  const handleSwitchNetwork = async () => {
+    await switchNetwork(NEON_DEVNET_CHAIN_ID, NEON_DEVNET_CONFIG)
   }
 
   const copyAddress = async () => {
@@ -57,162 +115,64 @@ export function MetaMaskWallet({
       await navigator.clipboard.writeText(address)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    }
-  }
 
-  const handleRefreshBalance = async () => {
-    setIsRefreshing(true)
-    await refreshBalance()
-    setIsRefreshing(false)
+      toast({
+        title: "Address Copied",
+        description: "Wallet address copied to clipboard",
+      })
+    }
   }
 
   const openMetaMask = () => {
     window.open("https://metamask.io/download/", "_blank")
   }
 
-  const viewOnExplorer = () => {
-    if (address) {
-      window.open(`https://devnet.neonscan.org/address/${address}`, "_blank")
-    }
+  const truncateAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
   // MetaMask not installed
   if (!isMetaMaskInstalled) {
     return (
-      <Card className="border-red-200 bg-red-50">
-        <CardContent className="p-4">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-              <div>
-                <h3 className="text-sm font-medium text-red-800">MetaMask Required</h3>
-                <p className="text-xs text-red-600">Please install MetaMask to continue</p>
-              </div>
-            </div>
-
-            <Button onClick={openMetaMask} className="w-full" size="sm">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Install MetaMask
-            </Button>
+      <Card className="border-2 border-dashed border-gray-300">
+        <CardContent className="flex flex-col items-center justify-center py-8 space-y-4">
+          <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+            <Wallet className="w-8 h-8 text-orange-600" />
           </div>
+          <div className="text-center space-y-2">
+            <h3 className="font-semibold text-gray-900">MetaMask Required</h3>
+            <p className="text-sm text-gray-600">Install MetaMask to connect your wallet and access zkResume</p>
+          </div>
+          <Button onClick={openMetaMask} className="w-full">
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Install MetaMask
+          </Button>
         </CardContent>
       </Card>
     )
   }
 
-  // Connected state
-  if (isConnected && address) {
+  // Not connected
+  if (!isConnected) {
     return (
-      <Card className={`${isCorrectNetwork ? "border-green-200 bg-green-50" : "border-orange-200 bg-orange-50"}`}>
-        <CardHeader className={compact ? "pb-2" : ""}>
-          <CardTitle className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <CheckCircle className={`w-4 h-4 ${isCorrectNetwork ? "text-green-600" : "text-orange-600"}`} />
-              <span className={isCorrectNetwork ? "text-green-800" : "text-orange-800"}>
-                {isCorrectNetwork ? "Connected to Neon" : "Wrong Network"}
-              </span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleDisconnect} className="h-6 w-6 p-0">
-              <Power className="w-3 h-3" />
-            </Button>
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className={`space-y-3 ${compact ? "pt-0" : ""}`}>
-          {/* Address */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <User className="w-3 h-3 text-gray-500" />
-                <span className="text-xs font-medium text-gray-600">Address</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={copyAddress} className="h-6 w-6 p-0">
-                  {copied ? <CheckCircle className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={viewOnExplorer} className="h-6 w-6 p-0">
-                  <ExternalLink className="w-3 h-3" />
-                </Button>
-              </div>
-            </div>
-            <code className="text-xs bg-white p-2 rounded border block font-mono">
-              {address.slice(0, 6)}...{address.slice(-4)}
-            </code>
+      <Card className="border-2 border-blue-200 bg-blue-50/50">
+        <CardContent className="flex flex-col items-center justify-center py-8 space-y-4">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+            <Wallet className="w-8 h-8 text-blue-600" />
           </div>
-
-          {/* Balance */}
-          {showBalance && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wallet className="w-3 h-3 text-gray-500" />
-                  <span className="text-xs font-medium text-gray-600">Balance</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRefreshBalance}
-                  disabled={isRefreshing}
-                  className="h-6 w-6 p-0"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
-                </Button>
-              </div>
-              <div className="bg-white p-2 rounded border">
-                <span className="text-xs font-mono">{balance ? `${Number(balance).toFixed(4)} NEON` : "0 NEON"}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Network Status */}
-          {showNetworkSwitch && !isCorrectNetwork && (
-            <>
-              <Separator />
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Network className="w-3 h-3 text-orange-600" />
-                  <span className="text-xs font-medium text-orange-800">Switch to Neon DevNet</span>
-                </div>
-                <Button onClick={switchToNeonDevNet} size="sm" className="w-full">
-                  <Network className="w-3 h-3 mr-2" />
-                  Switch Network
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Network Badge */}
-          <div className="flex justify-center">
-            <Badge variant={isCorrectNetwork ? "default" : "destructive"} className="text-xs">
-              {isCorrectNetwork ? "Neon DevNet" : "Wrong Network"}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Disconnected state
-  return (
-    <Card className="border-blue-200 bg-blue-50">
-      <CardContent className="p-4">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Wallet className="w-5 h-5 text-blue-600" />
-            <div>
-              <h3 className="text-sm font-medium text-blue-800">Connect MetaMask</h3>
-              <p className="text-xs text-blue-600">Connect your wallet to get started</p>
-            </div>
+          <div className="text-center space-y-2">
+            <h3 className="font-semibold text-gray-900">Connect Your Wallet</h3>
+            <p className="text-sm text-gray-600">Connect your MetaMask wallet to access your zkResume account</p>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded p-2">
+            <div className="bg-red-50 border border-red-200 rounded p-2 w-full">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-3 h-3 text-red-600 mt-0.5" />
                 <div>
                   <p className="text-xs font-medium text-red-800">Connection Error</p>
                   <p className="text-xs text-red-700">{error}</p>
-                  <Button variant="ghost" size="sm" onClick={clearError} className="h-5 text-xs mt-1 p-0">
+                  <Button variant="ghost" size="sm" onClick={() => setError(null)} className="h-5 text-xs mt-1 p-0">
                     Dismiss
                   </Button>
                 </div>
@@ -220,26 +180,114 @@ export function MetaMaskWallet({
             </div>
           )}
 
-          <Button onClick={handleConnect} disabled={isConnecting} className="w-full" size="sm">
-            {isConnecting ? (
+          <Button onClick={handleConnect} disabled={isLoading} className="w-full">
+            {isLoading ? (
               <>
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2" />
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                 Connecting...
               </>
             ) : (
               <>
-                <Wallet className="w-3 h-3 mr-2" />
+                <Wallet className="w-4 h-4 mr-2" />
                 Connect MetaMask
               </>
             )}
           </Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
-          <div className="text-xs text-blue-700 space-y-1">
-            <p>• MetaMask browser extension required</p>
-            <p>• Will switch to Neon DevNet automatically</p>
-            <p>• Your data remains private and secure</p>
+  // Wrong network
+  if (showNetworkSwitch && !isCorrectNetwork) {
+    return (
+      <Card className="border-2 border-yellow-200 bg-yellow-50/50">
+        <CardContent className="flex flex-col items-center justify-center py-8 space-y-4">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-yellow-600" />
+          </div>
+          <div className="text-center space-y-2">
+            <h3 className="font-semibold text-gray-900">Wrong Network</h3>
+            <p className="text-sm text-gray-600">Please switch to Neon DevNet to continue</p>
+          </div>
+          <Button onClick={handleSwitchNetwork} disabled={isLoading} className="w-full" variant="outline">
+            {isLoading ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Switching...
+              </>
+            ) : (
+              "Switch to Neon DevNet"
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Connected and correct network
+  return (
+    <Card className="border-2 border-green-200 bg-green-50/50">
+      <CardContent className={`${compact ? "py-4" : "py-6"} space-y-4`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Wallet Connected</p>
+              <Badge variant="secondary" className="text-xs">
+                Neon DevNet
+              </Badge>
+            </div>
           </div>
         </div>
+
+        {!compact && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Address</p>
+                <p className="font-mono text-sm">{address && truncateAddress(address)}</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={copyAddress}>
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {showBalance && (
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Balance</p>
+                  <p className="font-semibold">{balance || "0"} NEON</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={refreshBalance} disabled={isRefreshing}>
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {redirectToDashboard && !compact && (
+          <Button onClick={() => router.push("/dashboard")} className="w-full">
+            Continue to Dashboard
+          </Button>
+        )}
+
+        {!compact && (
+          <div className="text-center">
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => address && window.open(`https://devnet.neonscan.org/address/${address}`, "_blank")}
+              className="text-xs text-gray-500"
+            >
+              <ExternalLink className="w-3 h-3 mr-1" />
+              View on NeonScan
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

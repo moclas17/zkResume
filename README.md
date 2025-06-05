@@ -36,7 +36,7 @@ The result: a cryptographic resume snapshot that protects user privacy and prove
 
 ## 📦 Installation
 
-```bash
+\`\`\`bash
 git clone https://github.com/your-repo/zkresume-snapshot.git
 cd zkresume-snapshot
 npm install

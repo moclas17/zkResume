@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,12 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Shield, Lock, ArrowLeft, AlertCircle } from "lucide-react"
+import { Shield, Lock, ArrowLeft, AlertCircle, Wallet, ExternalLink, Info } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useConfidentialProcessing } from "../../hooks/use-confidential-processing"
 import type { ExperienceData } from "../../types/experience"
-import { MetaMaskWallet } from "../../components/metamask-wallet"
+import { WalletConnection } from "../../components/wallet-connection"
 
 export default function UploadPage() {
   const router = useRouter()
@@ -31,8 +31,34 @@ export default function UploadPage() {
   const [walletConnected, setWalletConnected] = useState(false)
   const [userAddress, setUserAddress] = useState<string>("")
 
+  // Check wallet connection on component mount
+  useEffect(() => {
+    const checkWalletConnection = async () => {
+      if (typeof window !== "undefined" && window.ethereum) {
+        try {
+          const accounts = await window.ethereum.request({ method: "eth_accounts" })
+          if (accounts && accounts.length > 0) {
+            setWalletConnected(true)
+            setUserAddress(accounts[0])
+            console.log("Wallet already connected on mount:", accounts[0])
+          }
+        } catch (err) {
+          console.error("Error checking wallet connection:", err)
+        }
+      }
+    }
+
+    checkWalletConnection()
+  }, [])
+
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleWalletConnectionChange = (connected: boolean, address?: string) => {
+    console.log("Wallet connection changed:", { connected, address })
+    setWalletConnected(connected)
+    setUserAddress(address || "")
   }
 
   const isFormValid = formData.role && formData.experience && formData.industry && formData.description
@@ -40,7 +66,10 @@ export default function UploadPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!isFormValid) return
+    if (!isFormValid || !walletConnected) {
+      console.log("Form validation failed:", { isFormValid, walletConnected })
+      return
+    }
 
     try {
       const experienceData: ExperienceData = {
@@ -53,17 +82,8 @@ export default function UploadPage() {
 
       const result = await processExperience(experienceData)
 
-      // Redirect to processing page with real data and form data for NFT metadata
-      const params = new URLSearchParams({
-        taskId: result.taskId,
-        hash: result.hash,
-        role: formData.role,
-        experience: formData.experience,
-        industry: formData.industry,
-        allowValidation: formData.allowValidation.toString(),
-      })
-
-      router.push(`/processing?${params.toString()}`)
+      // Redirect to processing page with real data
+      router.push(`/processing?taskId=${result.taskId}&hash=${result.hash}&simulated=${result.isSimulated || false}`)
     } catch (err) {
       console.error("Error processing experience:", err)
       // Error is handled in the hook
@@ -71,6 +91,14 @@ export default function UploadPage() {
   }
 
   const canSubmit = isFormValid && walletConnected && !isProcessing
+
+  console.log("Upload page state:", {
+    isFormValid,
+    walletConnected,
+    userAddress,
+    canSubmit,
+    isProcessing,
+  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -98,18 +126,30 @@ export default function UploadPage() {
           </p>
         </div>
 
-        {/* MetaMask wallet connection */}
+        {/* Wallet connection component */}
         <div className="mb-6">
-          <MetaMaskWallet
-            onConnectionChange={(connected, address) => {
-              setWalletConnected(connected)
-              setUserAddress(address || "")
-            }}
-            showBalance={true}
-            showNetworkSwitch={true}
-            compact={false}
-          />
+          <WalletConnection onConnectionChange={handleWalletConnectionChange} showBalance={true} compact={false} />
         </div>
+
+        {/* RLC Info Card */}
+        <Card className="mb-6 border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-blue-800 mb-1">RLC Tokens Information</p>
+                <p className="text-blue-700 mb-2">
+                  For real iExec processing, you need RLC tokens. If you don't have RLC, the system will use simulation
+                  mode to generate a valid hash for NFT minting.
+                </p>
+                <p className="text-blue-600 text-xs">
+                  ✓ Simulation mode still generates cryptographic proofs for NFT minting
+                  <br />✓ You can test the complete flow without RLC tokens
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="shadow-lg border-0">
           <CardHeader>
@@ -221,30 +261,65 @@ export default function UploadPage() {
               )}
 
               {isProcessing && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div
+                  className={`border rounded-lg p-4 ${
+                    status.isSimulated ? "bg-yellow-50 border-yellow-200" : "bg-blue-50 border-blue-200"
+                  }`}
+                >
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span>{status.message}</span>
-                      <span className="text-blue-600">{status.progress}%</span>
+                      <span className={status.isSimulated ? "text-yellow-800" : "text-blue-800"}>{status.message}</span>
+                      <span className={status.isSimulated ? "text-yellow-600" : "text-blue-600"}>
+                        {status.progress}%
+                      </span>
                     </div>
-                    <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          status.isSimulated ? "bg-yellow-500" : "bg-blue-600"
+                        }`}
                         style={{ width: `${status.progress}%` }}
                       />
                     </div>
                     {status.taskId && (
-                      <p className="text-xs text-blue-700">
-                        iExec task ID: <code className="bg-blue-100 px-1 rounded">{status.taskId}</code>
-                      </p>
+                      <div className="flex flex-col gap-1">
+                        <p className={`text-xs ${status.isSimulated ? "text-yellow-700" : "text-blue-700"}`}>
+                          {status.isSimulated ? "Simulated " : ""}Task ID:{" "}
+                          <code className={`px-1 rounded ${status.isSimulated ? "bg-yellow-100" : "bg-blue-100"}`}>
+                            {status.taskId}
+                          </code>
+                        </p>
+                        {status.explorerUrl && !status.isSimulated && (
+                          <a
+                            href={status.explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-700 flex items-center hover:underline"
+                          >
+                            View on iExec Explorer <ExternalLink className="w-3 h-3 ml-1" />
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
               )}
 
+              {/* Debug info */}
+              {process.env.NODE_ENV === "development" && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs text-gray-600">
+                    Debug: Form valid: {isFormValid ? "✓" : "✗"} | Wallet connected: {walletConnected ? "✓" : "✗"} | Can
+                    submit: {canSubmit ? "✓" : "✗"}
+                  </p>
+                </div>
+              )}
+
               <Button type="submit" className="w-full py-6 text-lg" disabled={!canSubmit}>
                 {!walletConnected ? (
-                  "Connect MetaMask first"
+                  "Connect your wallet first"
+                ) : !isFormValid ? (
+                  "Complete all required fields"
                 ) : isProcessing ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
@@ -252,7 +327,7 @@ export default function UploadPage() {
                   </>
                 ) : (
                   <>
-                    <Lock className="w-5 h-5 mr-2" />
+                    <Wallet className="w-5 h-5 mr-2" />
                     Process privately with iExec
                   </>
                 )}
